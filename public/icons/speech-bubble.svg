@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Speech bubble</title>
+  <path
+    d="M28 22h72c11.046 0 20 8.954 20 20v34c0 11.046-8.954 20-20 20H70L43 116l5-20H28C16.954 96 8 87.046 8 76V42c0-11.046 8.954-20 20-20Z"
+    fill="#F0FF72"
+    stroke="#111318"
+    stroke-width="8"
+    stroke-linejoin="round"
+  />
+  <circle cx="43" cy="60" r="7" fill="#111318"/>
+  <circle cx="64" cy="60" r="7" fill="#111318"/>
+  <circle cx="85" cy="60" r="7" fill="#111318"/>
+</svg>
