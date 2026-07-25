@@ -1,4 +1,6 @@
+const engine = document.querySelector("#engine");
 const voice = document.querySelector("#voice");
+const voiceSetting = document.querySelector("#voice-setting");
 const speed = document.querySelector("#speed");
 const speedValue = document.querySelector("#speed-value");
 const volume = document.querySelector("#volume");
@@ -24,6 +26,7 @@ const preparingStatuses = new Set(["loading", "generating"]);
 let currentState = {
   status: "idle",
   message: "Ready",
+  engine: null,
   current: 0,
   total: 0,
   position: 0,
@@ -37,6 +40,7 @@ let statusRefreshInFlight = false;
 
 function settings() {
   return {
+    engine: engine.value === "kokoro" ? "kokoro" : "system",
     voice: voice.value,
     speed: Number(speed.value),
     volume: Number(volume.value)
@@ -53,6 +57,12 @@ function formatClock(seconds) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = Math.floor(safeSeconds % 60);
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function renderEngineChoice() {
+  const usesKokoro = engine.value === "kokoro";
+  voice.disabled = !usesKokoro;
+  voiceSetting.classList.toggle("disabled", !usesKokoro);
 }
 
 function renderLatency() {
@@ -78,6 +88,11 @@ function renderActivity() {
   if (!isPreparing) return;
 
   const sinceUpdate = Date.now() - (Number(currentState.updatedAt) || Date.now());
+  if (currentState.engine === "system") {
+    activityText.textContent = sinceUpdate > 3_000 ? "Still starting the system voice" : "Starting the system voice";
+    return;
+  }
+
   if (sinceUpdate > 10_000) {
     activityText.textContent = currentState.status === "loading" ? "Still loading the voice model" : "Still generating audio";
     return;
@@ -101,9 +116,13 @@ function renderTimeline() {
     remainingText.textContent = hasTimeline ? `${formatClock(duration - position)} left` : "—";
   }
 
-  segmentText.textContent = currentState.total > 0
-    ? `Part ${Math.min(currentState.current || 1, currentState.total)} of ${currentState.total}`
-    : "Waiting for audio";
+  if (currentState.engine === "system" && currentState.total > 0) {
+    segmentText.textContent = "Approximate · system voice";
+  } else {
+    segmentText.textContent = currentState.total > 0
+      ? `Part ${Math.min(currentState.current || 1, currentState.total)} of ${currentState.total}`
+      : "Waiting for audio";
+  }
 }
 
 function render(state = {}) {
@@ -155,6 +174,7 @@ async function refreshPreparingStatus() {
 function updateSettingLabels() {
   speedValue.value = `${Number(speed.value).toFixed(2).replace(/0$/, "")}×`;
   volumeValue.value = `${Math.round(Number(volume.value) * 100)}%`;
+  renderEngineChoice();
 }
 
 async function saveSettings() {
@@ -174,6 +194,7 @@ async function read(mode) {
   render({
     status: "loading",
     message: mode === "selection" ? "Getting selection…" : "Getting page text…",
+    engine: settings().engine,
     current: 0,
     total: 0,
     position: 0,
@@ -206,6 +227,7 @@ readPage.addEventListener("click", () => read("page"));
 pause.addEventListener("click", () => request({ type: "PLAYER_COMMAND", command: "pause" }).catch((error) => render({ status: "error", message: error.message })));
 resume.addEventListener("click", () => request({ type: "PLAYER_COMMAND", command: "resume" }).catch((error) => render({ status: "error", message: error.message })));
 stop.addEventListener("click", () => request({ type: "PLAYER_COMMAND", command: "stop" }).catch((error) => render({ status: "error", message: error.message })));
+engine.addEventListener("change", () => saveSettings().catch((error) => render({ status: "error", message: error.message })));
 voice.addEventListener("change", saveSettings);
 speed.addEventListener("input", saveSettings);
 volume.addEventListener("input", () => applyVolume().catch((error) => render({ status: "error", message: error.message })));
@@ -245,10 +267,11 @@ async function initialise() {
   render(currentState);
 
   const [storedSettings, storedSession] = await Promise.all([
-    chrome.storage.local.get({ voice: "af_heart", speed: 1, volume: 1 }),
+    chrome.storage.local.get({ engine: "system", voice: "af_heart", speed: 1, volume: 1 }),
     chrome.storage.session.get({ playerState: null }).catch(() => ({ playerState: null }))
   ]);
 
+  engine.value = storedSettings.engine === "kokoro" ? "kokoro" : "system";
   voice.value = storedSettings.voice;
   speed.value = String(storedSettings.speed);
   volume.value = String(storedSettings.volume);
