@@ -1,9 +1,9 @@
 {
   "name": "justreadit",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "type": "module",
-  "description": "A private, local-first Kokoro text-to-speech browser extension.",
+  "description": "A private, local-first text-to-speech browser extension with instant system and natural Kokoro modes.",
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test",

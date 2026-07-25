@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Just Read It",
-  "version": "0.1.6",
-  "description": "Read selected text or the current page aloud with local Kokoro TTS.",
+  "version": "0.1.7",
+  "description": "Read selected text or the current page aloud with instant system speech or local Kokoro TTS.",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon-16.png",
@@ -15,7 +15,8 @@
     "contextMenus",
     "offscreen",
     "scripting",
-    "storage"
+    "storage",
+    "tts"
   ],
   "host_permissions": [
     "https://huggingface.co/*",
