@@ -1,13 +1,14 @@
 import { KokoroTTS, env } from "kokoro-js";
 
 const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
+const DEFAULT_VOICE = "af_heart";
 
 let ttsPromise = null;
 let inferenceQueue = Promise.resolve();
 let modelProgressRequestId = null;
 let pendingUserGenerations = 0;
+let prewarming = false;
 const warmedVoices = new Set();
-const warmingVoices = new Set();
 
 function serialiseProgress(progress) {
   return {
@@ -42,27 +43,26 @@ async function getTts(requestId = null) {
 }
 
 function normaliseVoice(settings = {}) {
-  return typeof settings.voice === "string" ? settings.voice : "af_heart";
+  return typeof settings.voice === "string" ? settings.voice : DEFAULT_VOICE;
 }
 
-async function prewarmEngine(settings = {}) {
-  const voice = normaliseVoice(settings);
-  if (warmedVoices.has(voice) || warmingVoices.has(voice)) return;
+async function prewarmEngine() {
+  if (prewarming || warmedVoices.has(DEFAULT_VOICE)) return;
 
-  warmingVoices.add(voice);
+  prewarming = true;
   try {
     const tts = await getTts();
     const task = inferenceQueue.then(async () => {
-      if (pendingUserGenerations > 0 || warmedVoices.has(voice)) return;
-      await tts.generate("a", { voice, speed: 1 });
-      warmedVoices.add(voice);
+      if (pendingUserGenerations > 0 || warmedVoices.has(DEFAULT_VOICE)) return;
+      await tts.generate("a", { voice: DEFAULT_VOICE, speed: 1 });
+      warmedVoices.add(DEFAULT_VOICE);
     });
     inferenceQueue = task.catch(() => {});
     await task;
   } catch {
     // Prewarming is an optimisation only. A real request will retry and surface errors.
   } finally {
-    warmingVoices.delete(voice);
+    prewarming = false;
   }
 }
 
@@ -86,11 +86,7 @@ self.addEventListener("message", (event) => {
 
   if (message?.type === "INIT") {
     env.wasmPaths = message.wasmPaths;
-    return;
-  }
-
-  if (message?.type === "PREWARM") {
-    prewarmEngine(message.settings);
+    prewarmEngine();
     return;
   }
 
