@@ -14,5 +14,5 @@ test("Instant mode is the local low-latency default", async () => {
   assert.match(background, /chrome\.storage\.local\.get\(\{ engine: SYSTEM_ENGINE/);
   assert.match(background, /voice\.remote !== true/);
   assert.match(background, /chrome\.tts\.speak\(/);
-  assert.match(background, /case "seek"[\s\S]*startSystemReading/);
+  assert.match(background, /command === "seek"[\s\S]*startSystemReading/);
 });
