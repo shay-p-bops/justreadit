@@ -34,17 +34,18 @@ async function sendToOffscreen(message) {
 }
 
 async function getSettings() {
-  const stored = await chrome.storage.local.get({ voice: "af_heart", speed: 1 });
+  const stored = await chrome.storage.local.get({ voice: "af_heart", speed: 1, volume: 1 });
   return {
     voice: typeof stored.voice === "string" ? stored.voice : "af_heart",
-    speed: Number.isFinite(Number(stored.speed)) ? Number(stored.speed) : 1
+    speed: Number.isFinite(Number(stored.speed)) ? Number(stored.speed) : 1,
+    volume: Number.isFinite(Number(stored.volume)) ? Number(stored.volume) : 1
   };
 }
 
-async function startReading(text, settings) {
+async function startReading(text, settings, startedAt = Date.now()) {
   const cleaned = String(text ?? "").trim();
   if (!cleaned) throw new Error("No text to read.");
-  return sendToOffscreen({ type: "START_READING", text: cleaned, settings });
+  return sendToOffscreen({ type: "START_READING", text: cleaned, settings, startedAt });
 }
 
 async function extractFromActiveTab(mode) {
@@ -77,7 +78,7 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== MENU_ID || !info.selectionText) return;
   try {
-    await startReading(info.selectionText, await getSettings());
+    await startReading(info.selectionText, await getSettings(), Date.now());
   } catch (error) {
     console.error("Just Read It:", error);
   }
@@ -96,12 +97,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case "READ_ACTIVE_TAB": {
         const result = await extractFromActiveTab(message.mode);
         if (!result?.ok) throw new Error(result?.error || "No readable text found.");
-        return startReading(result.text, message.settings);
+        return startReading(result.text, await getSettings(), message.startedAt);
       }
       case "PLAYER_COMMAND":
-        return sendToOffscreen({ type: "PLAYER_COMMAND", command: message.command });
+        return sendToOffscreen({ type: "PLAYER_COMMAND", command: message.command, value: message.value });
       case "GET_STATUS":
-        if (!(await hasOffscreenDocument())) return { ok: true, state: { status: "idle", message: "Ready" } };
+        if (!(await hasOffscreenDocument())) return { ok: true, state: { status: "idle", message: "Ready", startedAt: null, startupMs: null } };
         return chrome.runtime.sendMessage({ target: "offscreen", type: "GET_STATUS" });
       default:
         throw new Error("Unknown request.");

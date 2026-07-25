@@ -126,6 +126,13 @@ button.primary { border-color: #f0ff72; background: #f0ff72; color: #111318; }
 #status-dot.busy { background: #f0ff72; box-shadow: 0 0 10px #f0ff72; }
 #status-dot.error { background: #ff6b75; }
 
+.latency {
+  margin-left: auto;
+  color: #aeb5c2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .note {
   margin: 10px 2px 0;
   color: #858e9e;

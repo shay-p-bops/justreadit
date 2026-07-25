@@ -32,6 +32,11 @@
           Speed <output id="speed-value" for="speed">1.0×</output>
           <input id="speed" type="range" min="0.75" max="1.35" step="0.05" value="1" />
         </label>
+
+        <label>
+          Volume <output id="volume-value" for="volume">100%</output>
+          <input id="volume" type="range" min="0" max="1" step="0.05" value="1" />
+        </label>
       </section>
 
       <section class="primary-actions" aria-label="Start reading">
@@ -48,9 +53,10 @@
       <div class="status" role="status" aria-live="polite">
         <span id="status-dot"></span>
         <span id="status-text">Ready</span>
+        <span id="latency-text" class="latency" aria-hidden="true"></span>
       </div>
 
-      <p class="note">The first play downloads the voice model. After that, inference stays on this device.</p>
+      <p class="note">The first play downloads the voice model. The startup timer shows the wait until audio actually begins.</p>
     </main>
     <script type="module" src="popup.js"></script>
   </body>

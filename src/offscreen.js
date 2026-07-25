@@ -7,9 +7,10 @@ let ttsPromise = null;
 let currentAudio = null;
 let currentAudioUrl = null;
 let currentPlaybackDone = null;
+let currentVolume = 1;
 let runId = 0;
 let inferenceQueue = Promise.resolve();
-let state = { status: "idle", message: "Ready", current: 0, total: 0 };
+let state = { status: "idle", message: "Ready", current: 0, total: 0, startedAt: null, startupMs: null };
 
 env.wasmPaths = chrome.runtime.getURL("wasm/");
 
@@ -40,6 +41,10 @@ async function getTts() {
   return ttsPromise;
 }
 
+function normaliseVolume(value) {
+  return Math.min(1, Math.max(0, Number(value) || 0));
+}
+
 function clearAudio() {
   if (currentAudio) {
     currentAudio.pause();
@@ -64,9 +69,8 @@ async function playAudio(rawAudio, id, index, total) {
 
   currentAudioUrl = URL.createObjectURL(rawAudio.toBlob());
   const audio = new Audio(currentAudioUrl);
+  audio.volume = currentVolume;
   currentAudio = audio;
-
-  publish({ status: "playing", message: `Reading ${index} of ${total}`, current: index, total });
 
   await new Promise((resolve, reject) => {
     let settled = false;
@@ -79,7 +83,15 @@ async function playAudio(rawAudio, id, index, total) {
     currentPlaybackDone = () => finish();
     audio.onended = () => finish();
     audio.onerror = () => finish(new Error("Audio playback failed."));
-    audio.play().catch(finish);
+    audio.play()
+      .then(() => {
+        if (id !== runId) return;
+        const startupMs = Number.isFinite(state.startupMs)
+          ? state.startupMs
+          : Math.max(0, Date.now() - state.startedAt);
+        publish({ status: "playing", message: `Reading ${index} of ${total}`, current: index, total, startupMs });
+      })
+      .catch(finish);
   });
 
   if (currentAudio === audio) clearAudio();
@@ -92,9 +104,12 @@ function generate(tts, text, settings) {
   return task;
 }
 
-async function startReading(text, settings = {}) {
+async function startReading(text, settings = {}, requestedAt = Date.now()) {
   const id = ++runId;
   stopCurrentAudio();
+
+  const startedAt = Number.isFinite(Number(requestedAt)) ? Number(requestedAt) : Date.now();
+  publish({ status: "loading", message: "Starting speech…", current: 0, total: 0, startedAt, startupMs: null });
 
   try {
     const chunks = chunkText(text);
@@ -102,13 +117,19 @@ async function startReading(text, settings = {}) {
 
     const voice = typeof settings.voice === "string" ? settings.voice : "af_heart";
     const speed = Math.min(1.35, Math.max(0.75, Number(settings.speed) || 1));
+    currentVolume = normaliseVolume(settings.volume ?? 1);
     const tts = await getTts();
     if (id !== runId) return;
 
     let nextAudio = generate(tts, chunks[0], { voice, speed });
 
     for (let index = 0; index < chunks.length; index += 1) {
-      publish({ status: "generating", message: `Generating ${index + 1} of ${chunks.length}`, current: index + 1, total: chunks.length });
+      publish({
+        status: "generating",
+        message: index === 0 ? "Generating first audio…" : `Generating ${index + 1} of ${chunks.length}`,
+        current: index + 1,
+        total: chunks.length
+      });
       const audio = await nextAudio;
       if (id !== runId) return;
 
@@ -140,10 +161,15 @@ async function resume() {
   publish({ status: "playing", message: `Reading ${state.current} of ${state.total}` });
 }
 
+function setVolume(value) {
+  currentVolume = normaliseVolume(value);
+  if (currentAudio) currentAudio.volume = currentVolume;
+}
+
 function stop() {
   runId += 1;
   stopCurrentAudio();
-  publish({ status: "idle", message: "Stopped", current: 0, total: 0 });
+  publish({ status: "idle", message: "Stopped", current: 0, total: 0, startedAt: null, startupMs: null });
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -156,7 +182,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   (async () => {
     if (message.type === "START_READING") {
-      startReading(message.text, message.settings);
+      startReading(message.text, message.settings, message.startedAt);
       return { ok: true };
     }
 
@@ -164,6 +190,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message.command === "pause") pause();
       else if (message.command === "resume") await resume();
       else if (message.command === "stop") stop();
+      else if (message.command === "set-volume") setVolume(message.value);
       return { ok: true };
     }
 
