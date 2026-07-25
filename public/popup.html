@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Just Read It</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="mark" aria-hidden="true">J</div>
+        <div>
+          <h1>Just Read It</h1>
+          <p>Local Kokoro speech</p>
+        </div>
+      </header>
+
+      <section class="settings" aria-label="Voice settings">
+        <label>
+          Voice
+          <select id="voice">
+            <option value="af_heart">Heart · US female</option>
+            <option value="af_bella">Bella · US female</option>
+            <option value="bf_emma">Emma · UK female</option>
+            <option value="am_michael">Michael · US male</option>
+            <option value="bm_george">George · UK male</option>
+          </select>
+        </label>
+
+        <label>
+          Speed <output id="speed-value" for="speed">1.0×</output>
+          <input id="speed" type="range" min="0.75" max="1.35" step="0.05" value="1" />
+        </label>
+      </section>
+
+      <section class="primary-actions" aria-label="Start reading">
+        <button id="read-selection" class="primary">Read selection</button>
+        <button id="read-page">Read page</button>
+      </section>
+
+      <section class="player" aria-label="Playback controls">
+        <button id="pause" title="Pause" aria-label="Pause">Ⅱ</button>
+        <button id="resume" title="Resume" aria-label="Resume">▶</button>
+        <button id="stop" title="Stop" aria-label="Stop">■</button>
+      </section>
+
+      <div class="status" role="status" aria-live="polite">
+        <span id="status-dot"></span>
+        <span id="status-text">Ready</span>
+      </div>
+
+      <p class="note">The first play downloads the voice model. After that, inference stays on this device.</p>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
