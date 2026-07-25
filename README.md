@@ -9,6 +9,7 @@ A small Chrome/Chromium extension that reads selected text or the main text of t
 - Right-click highlighted text and choose **Read selection with Just Read It**.
 - Pause, resume, stop, change voice, and adjust speed.
 - Cache the model and voice data after the first download.
+- Warm the cached speech engine when the browser starts or the popup opens, reducing click-to-speech latency for later reads.
 
 The default voice is `af_heart`, using the q8 Kokoro model for a good balance of speed and naturalness.
 
@@ -23,7 +24,7 @@ npm run build
 
 Then open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the generated `dist` folder.
 
-The first reading downloads the Kokoro model from Hugging Face. That initial run is slower; later runs use the browser cache. Inference and audio playback remain on-device.
+The first use still needs to download and initialise the Kokoro model. After that, the extension prewarms the cached model and its first inference in the background so playback can begin much sooner. Inference and audio playback remain on-device.
 
 ## Development
 
@@ -44,5 +45,6 @@ npm run build
 ## Current limitations
 
 - English voices only.
+- A first-ever model download cannot meet the normal warm-start latency target.
 - Model inference cannot be interrupted mid-chunk; Stop takes effect immediately for playback and ignores the in-flight result.
 - Browser-internal pages such as `chrome://` cannot be read.
