@@ -2,7 +2,7 @@ name: Agent delivery
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [CI, Version contract]
     types: [completed]
 
 permissions:
@@ -29,6 +29,12 @@ jobs:
           [[ -n "$number" ]] || exit 0
           jq -e '.[0].labels | any(.name == "delivery:hold")' <<<"$pr" >/dev/null && exit 0 || true
           [[ "$(jq -r '.[0].headRefOid' <<<"$pr")" == "$HEAD_SHA" ]] || exit 0
+
+          runs="$(gh api "repos/$REPOSITORY/actions/runs?head_sha=$HEAD_SHA&per_page=100")"
+          for name in "CI" "Version contract"; do
+            conclusion="$(jq -r --arg name "$name" '[.workflow_runs[] | select(.name == $name)] | sort_by(.run_number) | last | .conclusion // ""' <<<"$runs")"
+            [[ "$conclusion" == success ]] || exit 0
+          done
 
           [[ "$(jq -r '.[0].isDraft' <<<"$pr")" != true ]] || gh pr ready "$number" --repo "$REPOSITORY"
           [[ "$(gh pr view "$number" --repo "$REPOSITORY" --json headRefOid --jq .headRefOid)" == "$HEAD_SHA" ]] || exit 0
