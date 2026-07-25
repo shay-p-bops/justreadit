@@ -1,6 +1,28 @@
 const OFFSCREEN_PATH = "offscreen.html";
 const MENU_ID = "just-read-it-selection";
+const ACTIVE_STATUSES = new Set(["loading", "generating", "playing", "paused"]);
+const IDLE_STATE = {
+  status: "idle",
+  message: "Ready",
+  current: 0,
+  total: 0,
+  position: 0,
+  duration: 0,
+  startedAt: null,
+  startupMs: null,
+  updatedAt: Date.now()
+};
+
 let creatingOffscreen = null;
+let latestState = { ...IDLE_STATE };
+let receivedLiveState = false;
+let restoringState = chrome.storage.session.get({ playerState: null })
+  .then(({ playerState }) => {
+    if (!receivedLiveState && playerState && typeof playerState === "object") {
+      latestState = { ...IDLE_STATE, ...playerState };
+    }
+  })
+  .catch(() => {});
 
 async function hasOffscreenDocument() {
   const documentUrl = chrome.runtime.getURL(OFFSCREEN_PATH);
@@ -33,6 +55,12 @@ async function sendToOffscreen(message) {
   return chrome.runtime.sendMessage({ ...message, target: "offscreen" });
 }
 
+function rememberState(nextState) {
+  receivedLiveState = true;
+  latestState = { ...IDLE_STATE, ...nextState, updatedAt: nextState.updatedAt ?? Date.now() };
+  chrome.storage.session.set({ playerState: latestState }).catch(() => {});
+}
+
 async function getSettings() {
   const stored = await chrome.storage.local.get({ voice: "af_heart", speed: 1, volume: 1 });
   return {
@@ -45,7 +73,34 @@ async function getSettings() {
 async function startReading(text, settings, startedAt = Date.now()) {
   const cleaned = String(text ?? "").trim();
   if (!cleaned) throw new Error("No text to read.");
-  return sendToOffscreen({ type: "START_READING", text: cleaned, settings, startedAt });
+
+  const pendingState = {
+    status: "loading",
+    message: "Starting speech…",
+    current: 0,
+    total: 0,
+    position: 0,
+    duration: 0,
+    startedAt,
+    startupMs: null,
+    updatedAt: Date.now()
+  };
+  rememberState(pendingState);
+  setBadge(pendingState.status);
+
+  try {
+    return await sendToOffscreen({ type: "START_READING", text: cleaned, settings, startedAt });
+  } catch (error) {
+    const errorState = {
+      ...pendingState,
+      status: "error",
+      message: error instanceof Error ? error.message : String(error),
+      updatedAt: Date.now()
+    };
+    rememberState(errorState);
+    setBadge(errorState.status);
+    throw error;
+  }
 }
 
 async function extractFromActiveTab(mode) {
@@ -86,6 +141,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "PLAYER_STATUS") {
+    rememberState(message.state || IDLE_STATE);
     setBadge(message.state?.status);
     return;
   }
@@ -101,9 +157,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case "PLAYER_COMMAND":
         return sendToOffscreen({ type: "PLAYER_COMMAND", command: message.command, value: message.value });
-      case "GET_STATUS":
-        if (!(await hasOffscreenDocument())) return { ok: true, state: { status: "idle", message: "Ready", startedAt: null, startupMs: null } };
-        return chrome.runtime.sendMessage({ target: "offscreen", type: "GET_STATUS" });
+      case "GET_STATUS": {
+        await restoringState;
+        if (ACTIVE_STATUSES.has(latestState.status) && !(await hasOffscreenDocument())) {
+          rememberState({ ...IDLE_STATE, updatedAt: Date.now() });
+        }
+        return { ok: true, state: latestState };
+      }
       default:
         throw new Error("Unknown request.");
     }
