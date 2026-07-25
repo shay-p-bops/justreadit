@@ -1,0 +1,134 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #111318;
+  color: #f5f7fb;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 330px;
+  background: #111318;
+}
+
+main { padding: 18px; }
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #f0ff72;
+  color: #111318;
+  font-weight: 900;
+  font-size: 20px;
+}
+
+h1 { margin: 0; font-size: 17px; line-height: 1.15; }
+header p { margin: 3px 0 0; color: #aeb5c2; font-size: 12px; }
+
+.settings {
+  display: grid;
+  gap: 13px;
+  padding: 14px;
+  border: 1px solid #292e38;
+  border-radius: 14px;
+  background: #181b22;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  color: #cbd0da;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+output { float: right; color: #f0ff72; }
+
+select,
+button {
+  font: inherit;
+}
+
+select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #343a46;
+  border-radius: 9px;
+  background: #101218;
+  color: #f5f7fb;
+}
+
+input[type="range"] { width: 100%; accent-color: #f0ff72; }
+
+.primary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+button {
+  min-height: 39px;
+  border: 1px solid #343a46;
+  border-radius: 10px;
+  background: #1b1f27;
+  color: #f5f7fb;
+  cursor: pointer;
+  font-weight: 720;
+}
+
+button:hover { border-color: #727b8d; }
+button:disabled { cursor: default; opacity: 0.45; }
+button.primary { border-color: #f0ff72; background: #f0ff72; color: #111318; }
+
+.player {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.player button { min-height: 34px; font-size: 13px; }
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #0d0f14;
+  color: #d9dde5;
+  font-size: 12px;
+}
+
+#status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #747d8e;
+}
+
+#status-dot.busy { background: #f0ff72; box-shadow: 0 0 10px #f0ff72; }
+#status-dot.error { background: #ff6b75; }
+
+.note {
+  margin: 10px 2px 0;
+  color: #858e9e;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
