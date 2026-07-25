@@ -24,8 +24,11 @@ generationWorker.postMessage({ type: "INIT", wasmPaths: chrome.runtime.getURL("w
 
 function publish(patch) {
   state = { ...state, ...patch, updatedAt: Date.now() };
-  chrome.storage.session.set({ playerState: state }).catch(() => {});
-  chrome.runtime.sendMessage({ type: "PLAYER_STATUS", state }).catch(() => {});
+  try {
+    chrome.runtime.sendMessage({ type: "PLAYER_STATUS", state }).catch(() => {});
+  } catch {
+    // The background may be restarting. State remains available through GET_STATUS.
+  }
 }
 
 function progressMessage(progress) {
