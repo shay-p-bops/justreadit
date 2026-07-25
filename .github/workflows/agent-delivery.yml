@@ -1,0 +1,37 @@
+name: Agent delivery
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  squash-merge:
+    if: github.event.workflow_run.event != 'push' && github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'agent/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deliver successful agent pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pr="$(gh pr list --repo "$REPOSITORY" --state open --head "$HEAD_BRANCH" --limit 1 --json number,isDraft,headRefOid,labels)"
+          number="$(jq -r '.[0].number // empty' <<<"$pr")"
+          [[ -n "$number" ]] || exit 0
+          jq -e '.[0].labels | any(.name == "delivery:hold")' <<<"$pr" >/dev/null && exit 0 || true
+          [[ "$(jq -r '.[0].headRefOid' <<<"$pr")" == "$HEAD_SHA" ]] || exit 0
+
+          [[ "$(jq -r '.[0].isDraft' <<<"$pr")" != true ]] || gh pr ready "$number" --repo "$REPOSITORY"
+          [[ "$(gh pr view "$number" --repo "$REPOSITORY" --json headRefOid --jq .headRefOid)" == "$HEAD_SHA" ]] || exit 0
+          result="$(gh api --method PUT "repos/$REPOSITORY/pulls/$number/merge" -f merge_method=squash -f sha="$HEAD_SHA")"
+          jq -e '.merged == true' <<<"$result" >/dev/null
+          gh api --method DELETE "repos/$REPOSITORY/git/refs/heads/$HEAD_BRANCH" || true
