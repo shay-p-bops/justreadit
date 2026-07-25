@@ -1,13 +1,15 @@
 {
   "name": "justreadit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "A private, local-first Kokoro text-to-speech browser extension.",
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test",
-    "check": "node --check src/background.js && node --check src/content.js && node --check src/offscreen.js && node --check src/popup.js && node --check src/text.js && node --check scripts/build.mjs"
+    "check": "npm run version:check && node --check src/background.js && node --check src/content.js && node --check src/offscreen.js && node --check src/popup.js && node --check src/text.js && node --check scripts/build.mjs && node --check scripts/bump-version.mjs && node --check scripts/version-contract.mjs",
+    "version:bump": "node scripts/bump-version.mjs",
+    "version:check": "node scripts/version-contract.mjs"
   },
   "dependencies": {
     "kokoro-js": "1.2.1"
