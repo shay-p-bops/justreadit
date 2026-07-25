@@ -59,6 +59,10 @@ function characterForPosition(text, position, duration) {
   return nextSpace === -1 ? approximate : nextSpace + 1;
 }
 
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 async function hasOffscreenDocument() {
   const documentUrl = chrome.runtime.getURL(OFFSCREEN_PATH);
   const contexts = await chrome.runtime.getContexts({
@@ -91,9 +95,16 @@ function prepareAudioEngine() {
   });
 }
 
+function prepareInstantEngine() {
+  getSystemVoice().catch((error) => {
+    console.warn("Just Read It could not prepare a local system voice:", error);
+  });
+}
+
 async function prepareSelectedEngine() {
   const settings = await getSettings();
   if (settings.engine === KOKORO_ENGINE) prepareAudioEngine();
+  else prepareInstantEngine();
 }
 
 async function sendToOffscreen(message) {
@@ -182,6 +193,37 @@ function stopSystemPlayback({ publish = false } = {}) {
   }
 }
 
+function markSystemStarted(playback, position) {
+  if (!systemPlayback || systemPlayback.id !== playback.id || playback.started) return;
+  playback.started = true;
+  rememberState({
+    status: "playing",
+    message: `Reading with ${playback.voice.voiceName || "system voice"}`,
+    engine: SYSTEM_ENGINE,
+    current: 1,
+    total: 1,
+    position,
+    duration: playback.duration,
+    startedAt: playback.startedAt,
+    startupMs: Math.max(0, Date.now() - playback.startedAt)
+  });
+  setBadge("playing");
+}
+
+function markSystemError(id, error) {
+  if (id !== systemRunId) return;
+  systemPlayback = null;
+  rememberState({
+    ...latestState,
+    status: "error",
+    message: error instanceof Error ? error.message : String(error),
+    engine: SYSTEM_ENGINE,
+    position: 0,
+    duration: 0
+  });
+  setBadge("error");
+}
+
 function handleSystemEvent(id, event) {
   const playback = systemPlayback;
   if (!playback || playback.id !== id) return;
@@ -191,21 +233,11 @@ function handleSystemEvent(id, event) {
 
   switch (event.type) {
     case "start":
-      rememberState({
-        status: "playing",
-        message: `Reading with ${playback.voice.voiceName || "system voice"}`,
-        engine: SYSTEM_ENGINE,
-        current: 1,
-        total: 1,
-        position,
-        duration: playback.duration,
-        startedAt: playback.startedAt,
-        startupMs: Math.max(0, Date.now() - playback.startedAt)
-      });
-      setBadge("playing");
+      markSystemStarted(playback, position);
       break;
     case "word":
     case "sentence":
+      markSystemStarted(playback, position);
       rememberState({ ...latestState, engine: SYSTEM_ENGINE, position, duration: playback.duration });
       break;
     case "pause":
@@ -213,10 +245,12 @@ function handleSystemEvent(id, event) {
       setBadge("paused");
       break;
     case "resume":
+      markSystemStarted(playback, position);
       rememberState({ ...latestState, status: "playing", message: "Reading · system voice", engine: SYSTEM_ENGINE, position });
       setBadge("playing");
       break;
     case "end":
+      markSystemStarted(playback, position);
       systemPlayback = null;
       rememberState({
         status: "idle",
@@ -238,16 +272,7 @@ function handleSystemEvent(id, event) {
       setBadge("idle");
       break;
     case "error":
-      systemPlayback = null;
-      rememberState({
-        ...latestState,
-        status: "error",
-        message: event.errorMessage || "System speech failed.",
-        engine: SYSTEM_ENGINE,
-        position: 0,
-        duration: 0
-      });
-      setBadge("error");
+      markSystemError(id, event.errorMessage || "System speech failed.");
       break;
     default:
       break;
@@ -260,9 +285,11 @@ async function startSystemReading(text, settings, startedAt = Date.now(), offset
 
   activeEngine = SYSTEM_ENGINE;
   stopSystemPlayback();
-  if (await hasOffscreenDocument()) {
-    chrome.runtime.sendMessage({ target: "offscreen", type: "PLAYER_COMMAND", command: "stop" }).catch(() => {});
-  }
+  hasOffscreenDocument()
+    .then((available) => {
+      if (available) chrome.runtime.sendMessage({ target: "offscreen", type: "PLAYER_COMMAND", command: "stop" }).catch(() => {});
+    })
+    .catch(() => {});
 
   const id = ++systemRunId;
   const duration = estimateSpeechDuration(fullText, settings.speed);
@@ -271,6 +298,22 @@ async function startSystemReading(text, settings, startedAt = Date.now(), offset
   const leadingWhitespace = remainder.length - remainder.trimStart().length;
   const spokenOffset = safeOffset + leadingWhitespace;
   const utterance = fullText.slice(spokenOffset);
+
+  if (!utterance) {
+    rememberState({
+      status: "idle",
+      message: "Finished",
+      engine: SYSTEM_ENGINE,
+      current: 1,
+      total: 1,
+      position: duration,
+      duration,
+      startedAt,
+      startupMs: 0
+    });
+    setBadge("idle");
+    return { ok: true };
+  }
 
   rememberState({
     status: "loading",
@@ -285,29 +328,41 @@ async function startSystemReading(text, settings, startedAt = Date.now(), offset
   });
   setBadge("loading");
 
-  const voice = await getSystemVoice();
-  if (id !== systemRunId) return { ok: true };
+  try {
+    const voice = await getSystemVoice();
+    if (id !== systemRunId) return { ok: true };
 
-  systemPlayback = {
-    id,
-    fullText,
-    offset: spokenOffset,
-    duration,
-    startedAt,
-    settings,
-    voice
-  };
+    systemPlayback = {
+      id,
+      fullText,
+      offset: spokenOffset,
+      duration,
+      startedAt,
+      settings,
+      voice,
+      started: false
+    };
 
-  await chrome.tts.speak(utterance, {
-    voiceName: voice.voiceName,
-    lang: voice.lang || "en-US",
-    rate: clamp(settings.speed, 0.5, 2),
-    volume: clamp(settings.volume, 0, 1),
-    desiredEventTypes: ["start", "word", "sentence", "end", "error", "pause", "resume"],
-    onEvent: (event) => handleSystemEvent(id, event)
-  });
+    await chrome.tts.speak(utterance, {
+      voiceName: voice.voiceName,
+      lang: voice.lang || "en-US",
+      rate: clamp(settings.speed, 0.5, 2),
+      volume: clamp(settings.volume, 0, 1),
+      desiredEventTypes: ["start", "word", "sentence", "end", "error", "pause", "resume"],
+      onEvent: (event) => handleSystemEvent(id, event)
+    });
 
-  return { ok: true };
+    await delay(150);
+    if (systemPlayback?.id === id && !systemPlayback.started && await chrome.tts.isSpeaking()) {
+      const position = positionForCharacter(spokenOffset, fullText.length, duration);
+      markSystemStarted(systemPlayback, position);
+    }
+
+    return { ok: true };
+  } catch (error) {
+    markSystemError(id, error);
+    throw error;
+  }
 }
 
 async function startKokoroReading(text, settings, startedAt = Date.now()) {
@@ -405,6 +460,10 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup.addListener(prepareSelectedEngine);
+chrome.tts.onVoicesChanged?.addListener(() => {
+  systemVoicePromise = null;
+  prepareSelectedEngine();
+});
 
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== MENU_ID || !info.selectionText) return;
@@ -445,6 +504,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
         const settings = await getSettings();
         if (settings.engine === KOKORO_ENGINE && !(await hasOffscreenDocument())) prepareAudioEngine();
+        else if (settings.engine === SYSTEM_ENGINE) prepareInstantEngine();
         return { ok: true, state: latestState };
       }
       default:
