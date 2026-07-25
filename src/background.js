@@ -39,8 +39,8 @@ async function ensureOffscreenDocument() {
 
   creatingOffscreen = chrome.offscreen.createDocument({
     url: OFFSCREEN_PATH,
-    reasons: ["AUDIO_PLAYBACK", "BLOBS"],
-    justification: "Generate local speech, create audio blobs, and play them."
+    reasons: ["WORKERS", "BLOBS"],
+    justification: "Run local speech generation in a worker, create audio blobs, and play them."
   });
 
   try {
@@ -59,6 +59,19 @@ function rememberState(nextState) {
   receivedLiveState = true;
   latestState = { ...IDLE_STATE, ...nextState, updatedAt: nextState.updatedAt ?? Date.now() };
   chrome.storage.session.set({ playerState: latestState }).catch(() => {});
+}
+
+function markAudioEngineInterrupted() {
+  const interruptedState = {
+    ...latestState,
+    status: "error",
+    message: "Audio engine stopped before playback. Try again.",
+    position: 0,
+    duration: 0,
+    updatedAt: Date.now()
+  };
+  rememberState(interruptedState);
+  setBadge(interruptedState.status);
 }
 
 async function getSettings() {
@@ -160,7 +173,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case "GET_STATUS": {
         await restoringState;
         if (ACTIVE_STATUSES.has(latestState.status) && !(await hasOffscreenDocument())) {
-          rememberState({ ...IDLE_STATE, updatedAt: Date.now() });
+          markAudioEngineInterrupted();
         }
         return { ok: true, state: latestState };
       }
