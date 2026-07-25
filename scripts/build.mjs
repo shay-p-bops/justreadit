@@ -29,7 +29,8 @@ await build({
   entryPoints: {
     background: join(root, "src/background.js"),
     offscreen: join(root, "src/offscreen.js"),
-    popup: join(root, "src/popup.js")
+    popup: join(root, "src/popup.js"),
+    "tts-worker": join(root, "src/tts-worker.js")
   },
   outdir: dist,
   format: "esm"
