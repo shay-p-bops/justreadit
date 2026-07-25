@@ -12,13 +12,21 @@
         <div class="mark" aria-hidden="true">J</div>
         <div>
           <h1>Just Read It</h1>
-          <p>Local Kokoro speech</p>
+          <p>Instant or natural local speech</p>
         </div>
       </header>
 
       <section class="settings" aria-label="Voice settings">
         <label>
-          Voice
+          Mode
+          <select id="engine">
+            <option value="system">Instant · system voice</option>
+            <option value="kokoro">Natural · Kokoro</option>
+          </select>
+        </label>
+
+        <label id="voice-setting">
+          Natural voice
           <select id="voice">
             <option value="af_heart">Heart · US female</option>
             <option value="af_bella">Bella · US female</option>
@@ -57,7 +65,7 @@
           <span id="segment-text">Waiting for audio</span>
           <span id="remaining-time">—</span>
         </div>
-        <input id="scrubber" type="range" min="0" max="1" step="0.1" value="0" aria-label="Seek within the current audio part" disabled />
+        <input id="scrubber" type="range" min="0" max="1" step="0.1" value="0" aria-label="Seek through playback" disabled />
       </section>
 
       <section class="player" aria-label="Playback controls">
@@ -72,7 +80,7 @@
         <span id="latency-text" class="latency" aria-hidden="true"></span>
       </div>
 
-      <p class="note">Playback progress is shown for the current generated part. The part counter shows how much remains after it.</p>
+      <p class="note"><strong>Instant</strong> uses a local operating-system voice for the fastest start and approximate seeking. <strong>Natural</strong> uses Kokoro and may take longer to generate each audio part.</p>
     </main>
     <script type="module" src="popup.js"></script>
   </body>
