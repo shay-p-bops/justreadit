@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Just Read It",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Read selected text or the current page aloud with local Kokoro TTS.",
   "minimum_chrome_version": "116",
   "permissions": [

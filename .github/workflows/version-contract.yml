@@ -1,0 +1,33 @@
+name: Version contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: Base commit used to classify the delivered change
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Enforce synchronized semantic versioning
+        env:
+          JUST_READ_IT_VERSION_BASE: ${{ inputs.base_sha || github.event.pull_request.base.sha || github.event.before }}
+        run: npm run version:check
