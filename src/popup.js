@@ -33,6 +33,7 @@ let currentState = {
   updatedAt: Date.now()
 };
 let isScrubbing = false;
+let statusRefreshInFlight = false;
 
 function settings() {
   return {
@@ -137,6 +138,20 @@ async function request(message, timeoutMs = 5_000) {
   }
 }
 
+async function refreshPreparingStatus() {
+  if (statusRefreshInFlight || !preparingStatuses.has(currentState.status)) return;
+  statusRefreshInFlight = true;
+
+  try {
+    const response = await request({ type: "GET_STATUS" }, 1_500);
+    render(response.state);
+  } catch {
+    // Keep showing the last live state; the next watchdog pass will retry.
+  } finally {
+    statusRefreshInFlight = false;
+  }
+}
+
 function updateSettingLabels() {
   speedValue.value = `${Number(speed.value).toFixed(2).replace(/0$/, "")}×`;
   volumeValue.value = `${Math.round(Number(volume.value) * 100)}%`;
@@ -224,6 +239,7 @@ setInterval(() => {
   renderLatency();
   renderActivity();
 }, 250);
+setInterval(refreshPreparingStatus, 2_000);
 
 async function initialise() {
   render(currentState);
