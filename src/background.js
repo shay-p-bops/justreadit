@@ -50,6 +50,12 @@ async function ensureOffscreenDocument() {
   }
 }
 
+function prepareAudioEngine() {
+  ensureOffscreenDocument().catch((error) => {
+    console.warn("Just Read It could not prewarm the audio engine:", error);
+  });
+}
+
 async function sendToOffscreen(message) {
   await ensureOffscreenDocument();
   return chrome.runtime.sendMessage({ ...message, target: "offscreen" });
@@ -141,7 +147,10 @@ chrome.runtime.onInstalled.addListener(() => {
       contexts: ["selection"]
     });
   });
+  prepareAudioEngine();
 });
+
+chrome.runtime.onStartup.addListener(prepareAudioEngine);
 
 chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== MENU_ID || !info.selectionText) return;
@@ -172,9 +181,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return sendToOffscreen({ type: "PLAYER_COMMAND", command: message.command, value: message.value });
       case "GET_STATUS": {
         await restoringState;
-        if (ACTIVE_STATUSES.has(latestState.status) && !(await hasOffscreenDocument())) {
+        const audioEngineAvailable = await hasOffscreenDocument();
+        if (ACTIVE_STATUSES.has(latestState.status) && !audioEngineAvailable) {
           markAudioEngineInterrupted();
         }
+        if (!audioEngineAvailable) prepareAudioEngine();
         return { ok: true, state: latestState };
       }
       default:
