@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test",
-    "check": "npm run version:check && node --check src/background.js && node --check src/content.js && node --check src/offscreen.js && node --check src/popup.js && node --check src/text.js && node --check scripts/build.mjs && node --check scripts/bump-version.mjs && node --check scripts/version-contract.mjs",
+    "check": "npm run version:check && node --check src/background.js && node --check src/content.js && node --check src/offscreen.js && node --check src/popup.js && node --check src/text.js && node --check src/tts-worker.js && node --check scripts/build.mjs && node --check scripts/bump-version.mjs && node --check scripts/version-contract.mjs",
     "version:bump": "node scripts/bump-version.mjs",
     "version:check": "node scripts/version-contract.mjs"
   },
